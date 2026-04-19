@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- SECURITY: CSP header equivalent via meta tag — restricts what can run on this page -->
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'self' https://cdnjs.cloudflare.com https://fonts.googleapis.com https://fonts.gstatic.com;
+                   script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://cdnjs.cloudflare.com;
+                   style-src  'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com;
+                   font-src   'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com;
+                   img-src    'self' data:;">
+    <title>ZR Health Care — Healthcare Management System</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Our CSS -->
+    <link rel="stylesheet" href="css/theme.css">
+
+    <style>
+        /* Loading overlay */
+        #db-loader {
+            position: fixed; inset: 0; z-index: 9999;
+            background: var(--black-deep, #0a0a0f);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 18px;
+        }
+
+        .loader-logo { font-size: 3rem; color: #9333ea; animation: pulse 1.2s infinite; }
+        .loader-text { color: #c084fc; font-size: 1.1rem; font-weight: 600; }
+        .loader-bar-wrap { width: 200px; height: 4px; background: #2a2a38; border-radius: 10px; overflow: hidden; }
+        .loader-bar { height: 100%; background: linear-gradient(90deg, #6b21a8, #9333ea); border-radius: 10px; animation: loadBar 1.5s infinite; }
+
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+        @keyframes loadBar { 0% { width:0; } 100% { width:100%; } }
+
+        /* SQL schema display */
+        .sql-keyword { color: #a855f7; font-weight: 700; }
+        .sql-type    { color: #06b6d4; }
+        .sql-comment { color: #6b7280; font-style: italic; }
+
+        /* Imaging test cards */
+        .test-type-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .test-type-card {
+            background: var(--bg-card);
+            border: 2px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 18px 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.25s;
+            color: var(--text-2);
+        }
+
+        .test-type-card:hover, .test-type-card.selected {
+            border-color: var(--purple-500);
+            background: rgba(107,33,168,0.1);
+            color: var(--purple-300);
+            transform: translateY(-2px);
+        }
+
+        .test-type-card i { font-size: 2rem; display: block; margin-bottom: 8px; }
+        .test-type-card span { font-weight: 600; font-size: 0.85rem; }
+
+        /* Security badge */
+        .security-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(16,185,129,0.1);
+            border: 1px solid rgba(16,185,129,0.3);
+            color: #6ee7b7;
+            padding: 4px 12px; border-radius: 20px;
+            font-size: 0.8rem; font-weight: 600;
+        }
+
+        /* Schema section */
+        .schema-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .schema-section h4 {
+            color: var(--purple-400);
+            margin-bottom: 10px;
+            display: flex; align-items: center; gap: 8px;
+        }
+
+        .security-map {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 14px;
+            margin-top: 16px;
+        }
+
+        .security-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--purple-500);
+            border-radius: var(--radius-md);
+            padding: 16px;
+        }
+
+        .security-item h5 { color: var(--purple-300); margin-bottom: 6px; font-size: 0.9rem; }
+        .security-item p  { font-size: 0.82rem; color: var(--text-2); margin-bottom: 4px; }
+        .security-item code {
+            font-size: 0.75rem; color: var(--accent-cyan);
+            background: rgba(6,182,212,0.1); padding: 2px 6px; border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── LOADING OVERLAY ──────────────────────────────────────────────────── -->
+<div id="db-loader">
+    <div class="loader-logo">
+        <!-- ZR LOGO SVG inline -->
+        <svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="30" cy="30" r="28" fill="url(#grad1)" stroke="#9333ea" stroke-width="2"/>
+            <path d="M18 20 L34 20 L18 40 L34 40" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <path d="M38 20 C44 20 48 23 48 27 C48 31 44 33 38 33 L38 33 L44 40" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <circle cx="38" cy="33" r="1.5" fill="#c084fc"/>
+            <defs>
+                <linearGradient id="grad1" x1="0" y1="0" x2="60" y2="60" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#1a0a2e"/>
+                    <stop offset="100%" stop-color="#6b21a8"/>
+                </linearGradient>
+            </defs>
+        </svg>
+    </div>
+    <div class="loader-text">Initialising ZR Health Care…</div>
+    <div class="loader-bar-wrap"><div class="loader-bar"></div></div>
+</div>
+
+<!-- ── MAIN APP ─────────────────────────────────────────────────────────── -->
+<div class="container">
+
+    <!-- HEADER -->
+    <header>
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-svg-wrap">
+                    <svg width="32" height="32" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 20 L34 20 L18 40 L34 40" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                        <path d="M38 20 C44 20 48 23 48 27 C48 31 44 33 38 33 L38 33 L44 40" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                        <path d="M28 30 L32 26 L34 30 L36 27 L38 30 L42 30" stroke="#c084fc" stroke-width="2" stroke-linecap="round" fill="none"/>
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <h1>ZR <span>Health</span> Care</h1>
+                    <p class="tagline">Your Health, Our Priority</p>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px">
+                <span class="security-badge"><i class="fas fa-shield-halved"></i> Secured</span>
+                <div class="user-info" onclick="handleLogout()">
+                    <i class="fas fa-user-circle"></i>
+                    <span id="current-user">Guest</span>
+                    <i class="fas fa-sign-out-alt" style="font-size:0.8rem;opacity:0.7"></i>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- NAV TABS -->
+    <nav class="nav-tabs">
+        <div class="tab active" data-tab="register"><i class="fas fa-user-plus"></i> Register</div>
+        <div class="tab" data-tab="login"><i class="fas fa-sign-in-alt"></i> Login</div>
+        <div class="tab" data-tab="dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</div>
+        <div class="tab" data-tab="appointments"><i class="fas fa-calendar-check"></i> Appointments</div>
+        <div class="tab" data-tab="test-results"><i class="fas fa-file-medical-alt"></i> Test Results</div>
+        <div class="tab" data-tab="imaging"><i class="fas fa-x-ray"></i> Imaging Tests</div>
+        <div class="tab" data-tab="sql-schema"><i class="fas fa-database"></i> SQL Schema</div>
+    </nav>
+
+    <!-- MESSAGE AREA -->
+    <div id="message-area"></div>
+
+    <!-- ══ REGISTER TAB ══════════════════════════════════════════════════ -->
+    <div class="tab-content active" id="register">
+        <div class="section-header">
+            <i class="fas fa-user-plus"></i>
+            <div><h2>Patient Registration</h2><p>Create your secure health profile</p></div>
+        </div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label><i class="fas fa-user"></i> Full Name</label>
+                <input type="text" id="name" placeholder="Enter your full name">
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-envelope"></i> Email Address</label>
+                <input type="email" id="email" placeholder="Enter your email">
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-lock"></i> Password <small style="color:var(--text-3)">(min 8 chars)</small></label>
+                <input type="password" id="password" placeholder="Create a strong password">
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-birthday-cake"></i> Age</label>
+                <input type="number" id="age" min="0" max="120" placeholder="Your age">
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-ruler-vertical"></i> Height (cm)</label>
+                <input type="number" id="height" min="50" max="250" placeholder="Height in cm">
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-weight"></i> Weight (kg)</label>
+                <input type="number" id="weight" min="10" max="300" placeholder="Weight in kg">
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-phone"></i> Phone Number</label>
+                <input type="tel" id="phone" placeholder="Your contact number">
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-phone-alt"></i> Emergency Contact</label>
+                <input type="tel" id="emergency-phone" placeholder="Emergency contact number">
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-shield-alt"></i> Health Insurance</label>
+                <select id="insurance">
+                    <option value="">Select Insurance Category</option>
+                    <option value="Premium Gold">Premium Gold</option>
+                    <option value="Silver Plus">Silver Plus</option>
+                    <option value="Basic Care">Basic Care</option>
+                    <option value="Senior Plan">Senior Plan</option>
+                    <option value="Family Plan">Family Plan</option>
+                    <option value="none">No Insurance</option>
+                </select>
+            </div>
+        </div>
+        <button class="btn" id="register-btn"><i class="fas fa-user-plus"></i> Register Patient</button>
+        <p style="margin-top:15px;font-size:0.9rem">Already registered? <a href="#" onclick="switchTab('login')">Login here</a></p>
+    </div>
+
+    <!-- ══ LOGIN TAB ═════════════════════════════════════════════════════ -->
+    <div class="tab-content" id="login">
+        <div class="section-header">
+            <i class="fas fa-sign-in-alt"></i>
+            <div><h2>Patient Login</h2><p>Access your health dashboard securely</p></div>
+        </div>
+        <div style="max-width:480px">
+            <div class="form-group">
+                <label><i class="fas fa-envelope"></i> Email Address</label>
+                <input type="email" id="login-email" placeholder="Enter your email">
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-lock"></i> Password</label>
+                <input type="password" id="login-password" placeholder="Enter your password">
+            </div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap">
+                <button class="btn" id="login-btn"><i class="fas fa-sign-in-alt"></i> Login</button>
+                <button class="btn btn-secondary" id="demo-login-btn"><i class="fas fa-magic"></i> Try Demo Account</button>
+            </div>
+            <div style="margin-top:20px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px">
+                <p style="font-size:0.85rem;color:var(--text-3)"><i class="fas fa-info-circle" style="color:var(--purple-400)"></i>
+                Demo credentials: <strong style="color:var(--purple-300)">demo@zrhealth.com</strong> / <strong style="color:var(--purple-300)">demo123</strong></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ DASHBOARD TAB ══════════════════════════════════════════════════ -->
+    <div class="tab-content" id="dashboard">
+        <div class="section-header">
+            <i class="fas fa-tachometer-alt"></i>
+            <div><h2>Health Dashboard</h2><p>Your live health metrics and patient profile</p></div>
+        </div>
+
+        <div class="health-data-grid">
+            <div class="health-card">
+                <h3><i class="fas fa-heartbeat"></i> Heart Rate</h3>
+                <div class="health-value" id="heart-rate">--</div>
+                <p>beats per minute</p>
+                <span class="health-status status-normal" id="heart-status">—</span>
+            </div>
+            <div class="health-card">
+                <h3><i class="fas fa-tint"></i> Blood Pressure</h3>
+                <div class="health-value" id="blood-pressure">--</div>
+                <p>mmHg</p>
+                <span class="health-status status-normal" id="bp-status">—</span>
+            </div>
+            <div class="health-card">
+                <h3><i class="fas fa-seedling"></i> Blood Sugar</h3>
+                <div class="health-value" id="blood-sugar">--</div>
+                <p>mg/dL</p>
+                <span class="health-status status-normal" id="sugar-status">—</span>
+            </div>
+            <div class="health-card">
+                <h3><i class="fas fa-shield-alt"></i> Insurance</h3>
+                <div id="insurance-status"><p style="color:var(--text-3)">Loading…</p></div>
+            </div>
+        </div>
+
+        <div style="margin-top:28px">
+            <h3 style="color:var(--purple-300);margin-bottom:14px"><i class="fas fa-user-circle"></i> Patient Profile</h3>
+            <div id="patient-info" style="color:var(--text-2)">Please login to view your profile.</div>
+        </div>
+
+        <div style="margin-top:28px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:24px">
+            <h3 style="color:var(--purple-300);margin-bottom:16px"><i class="fas fa-chart-line"></i> Update Health Metrics</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Heart Rate (bpm)</label>
+                    <input type="number" id="update-heart-rate" min="40" max="200" placeholder="e.g. 72">
+                </div>
+                <div class="form-group">
+                    <label>Blood Pressure (mmHg)</label>
+                    <input type="text" id="update-blood-pressure" placeholder="e.g. 120/80">
+                </div>
+                <div class="form-group">
+                    <label>Blood Sugar (mg/dL)</label>
+                    <input type="number" id="update-blood-sugar" min="50" max="500" placeholder="e.g. 95">
+                </div>
+            </div>
+            <button class="btn btn-success" id="update-health-btn"><i class="fas fa-sync-alt"></i> Update Metrics</button>
+        </div>
+    </div>
+
+    <!-- ══ APPOINTMENTS TAB ════════════════════════════════════════════════ -->
+    <div class="tab-content" id="appointments">
+        <div class="section-header">
+            <i class="fas fa-calendar-check"></i>
+            <div><h2>Doctor Appointments</h2><p>Schedule and view your medical appointments</p></div>
+        </div>
+        <div id="appointments-list"><p style="color:var(--text-2)">Please login to view appointments.</p></div>
+
+        <div style="margin-top:28px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:24px">
+            <h3 style="color:var(--purple-300);margin-bottom:16px"><i class="fas fa-plus-circle"></i> Schedule New Appointment</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Doctor / Specialist</label>
+                    <select id="appointment-doctor">
+                        <option value="">Select Doctor</option>
+                        <option>Dr. Sarah Johnson - Cardiology</option>
+                        <option>Dr. Michael Chen - General Physician</option>
+                        <option>Dr. Emma Williams - Endocrinology</option>
+                        <option>Dr. James Wilson - Neurology</option>
+                        <option>Dr. Lisa Garcia - Dermatology</option>
+                        <option>Dr. Ahmed Hassan - Radiology</option>
+                        <option>Dr. Fatima Al-Rashid - Orthopedics</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Appointment Date</label>
+                    <input type="date" id="appointment-date">
+                </div>
+                <div class="form-group">
+                    <label>Appointment Time</label>
+                    <select id="appointment-time">
+                        <option value="">Select Time</option>
+                        <option>09:00 AM</option><option>09:30 AM</option>
+                        <option>10:00 AM</option><option>10:30 AM</option>
+                        <option>11:00 AM</option><option>11:30 AM</option>
+                        <option>12:00 PM</option><option>02:00 PM</option>
+                        <option>02:30 PM</option><option>03:00 PM</option>
+                        <option>04:00 PM</option><option>04:30 PM</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Reason for Visit</label>
+                    <input type="text" id="appointment-reason" placeholder="Brief reason for appointment">
+                </div>
+            </div>
+            <button class="btn" id="schedule-appointment-btn"><i class="fas fa-calendar-plus"></i> Schedule Appointment</button>
+        </div>
+    </div>
+
+    <!-- ══ TEST RESULTS TAB ════════════════════════════════════════════════ -->
+    <div class="tab-content" id="test-results">
+        <div class="section-header">
+            <i class="fas fa-file-medical-alt"></i>
+            <div><h2>Medical Test Results</h2><p>Laboratory and diagnostic results</p></div>
+        </div>
+        <div id="test-results-list"><p style="color:var(--text-2)">Please login to view results.</p></div>
+
+        <div style="margin-top:28px">
+            <h3 style="color:var(--purple-300);margin-bottom:14px"><i class="fas fa-notes-medical"></i> Results Summary Table</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Test Name</th><th>Date</th><th>Result</th><th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="test-results-table">
+                    <tr><td colspan="4">Please login to view test results.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ══ IMAGING TESTS TAB ══════════════════════════════════════════════ -->
+    <div class="tab-content" id="imaging">
+        <div class="section-header">
+            <i class="fas fa-x-ray"></i>
+            <div><h2>Imaging &amp; Diagnostic Tests</h2><p>Book MRI, CT Scan, X-Ray, ECG, EMG and more</p></div>
+        </div>
+
+        <!-- Info cards for test types -->
+        <div class="test-type-grid" style="margin-bottom:28px">
+            <div class="test-type-card">
+                <i class="fas fa-magnet"></i>
+                <span>MRI</span>
+                <p style="font-size:0.75rem;margin-top:4px;color:var(--text-3)">Magnetic Resonance</p>
+            </div>
+            <div class="test-type-card">
+                <i class="fas fa-circle-dot"></i>
+                <span>CT Scan</span>
+                <p style="font-size:0.75rem;margin-top:4px;color:var(--text-3)">Computed Tomography</p>
+            </div>
+            <div class="test-type-card">
+                <i class="fas fa-radiation"></i>
+                <span>X-Ray</span>
+                <p style="font-size:0.75rem;margin-top:4px;color:var(--text-3)">Radiography</p>
+            </div>
+            <div class="test-type-card">
+                <i class="fas fa-heart-pulse"></i>
+                <span>ECG</span>
+                <p style="font-size:0.75rem;margin-top:4px;color:var(--text-3)">Electrocardiogram</p>
+            </div>
+            <div class="test-type-card">
+                <i class="fas fa-bolt"></i>
+                <span>EMG</span>
+                <p style="font-size:0.75rem;margin-top:4px;color:var(--text-3)">Electromyography</p>
+            </div>
+            <div class="test-type-card">
+                <i class="fas fa-wave-square"></i>
+                <span>Ultrasound</span>
+                <p style="font-size:0.75rem;margin-top:4px;color:var(--text-3)">Sonography</p>
+            </div>
+        </div>
+
+        <div id="imaging-list"><p style="color:var(--text-2)">Please login to view imaging appointments.</p></div>
+
+        <div style="margin-top:28px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:24px">
+            <h3 style="color:var(--purple-300);margin-bottom:16px"><i class="fas fa-plus-circle"></i> Book Imaging Test</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Test Type</label>
+                    <select id="imaging-type">
+                        <option value="">Select Test Type</option>
+                        <option value="MRI">MRI — Magnetic Resonance Imaging</option>
+                        <option value="CT Scan">CT Scan — Computed Tomography</option>
+                        <option value="X-Ray">X-Ray — Radiography</option>
+                        <option value="ECG">ECG — Electrocardiogram</option>
+                        <option value="EMG">EMG — Electromyography</option>
+                        <option value="Ultrasound">Ultrasound — Sonography</option>
+                        <option value="PET Scan">PET Scan</option>
+                        <option value="Mammogram">Mammogram</option>
+                        <option value="Bone Density">Bone Density Scan (DEXA)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Body Area / Region</label>
+                    <select id="imaging-body-area">
+                        <option value="">Select Area</option>
+                        <option>Brain / Head</option>
+                        <option>Neck / Spine</option>
+                        <option>Chest / Lungs</option>
+                        <option>Abdomen</option>
+                        <option>Pelvis</option>
+                        <option>Upper Limb (Arm/Shoulder)</option>
+                        <option>Lower Limb (Leg/Knee)</option>
+                        <option>Heart</option>
+                        <option>Full Body</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Priority Level</label>
+                    <select id="imaging-priority">
+                        <option value="Routine">Routine</option>
+                        <option value="Urgent">Urgent</option>
+                        <option value="Emergency">Emergency</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Preferred Date</label>
+                    <input type="date" id="imaging-date">
+                </div>
+                <div class="form-group">
+                    <label>Preferred Time</label>
+                    <select id="imaging-time">
+                        <option value="">Select Time</option>
+                        <option>08:00</option><option>09:00</option><option>10:00</option>
+                        <option>11:00</option><option>12:00</option><option>13:00</option>
+                        <option>14:00</option><option>15:00</option><option>16:00</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Clinical Notes / Symptoms</label>
+                    <input type="text" id="imaging-notes" placeholder="Describe symptoms or referring doctor notes">
+                </div>
+            </div>
+            <button class="btn" id="book-imaging-btn"><i class="fas fa-calendar-plus"></i> Book Imaging Test</button>
+        </div>
+    </div>
+
+    <!-- ══ SQL SCHEMA TAB ═════════════════════════════════════════════════ -->
+    <div class="tab-content" id="sql-schema">
+        <div class="section-header">
+            <i class="fas fa-database"></i>
+            <div><h2>SQL Database Schema</h2><p>Live SQLite database powering this application + full security map</p></div>
+        </div>
+
+        <!-- Security Map -->
+        <div style="margin-bottom:28px">
+            <h3 style="color:var(--purple-300);margin-bottom:14px"><i class="fas fa-shield-halved"></i> Security Architecture</h3>
+            <p style="margin-bottom:16px">Every security control is documented with its exact file and purpose:</p>
+            <div class="security-map">
+                <div class="security-item">
+                    <h5>🔐 Password Hashing</h5>
+                    <p><strong>File:</strong> <code>js/database.js</code></p>
+                    <p><strong>Function:</strong> <code>hashPassword()</code> ~line 50</p>
+                    <p>Uses SHA-256 via browser's <em>SubtleCrypto API</em> with a salt. Passwords are NEVER stored in plain text.</p>
+                </div>
+                <div class="security-item">
+                    <h5>💉 SQL Injection Prevention</h5>
+                    <p><strong>File:</strong> <code>js/database.js</code></p>
+                    <p><strong>Pattern:</strong> <code>db.run("SQL ?", [params])</code></p>
+                    <p>All queries use parameterised placeholders. User input is never concatenated into SQL strings.</p>
+                </div>
+                <div class="security-item">
+                    <h5>🧹 XSS Prevention</h5>
+                    <p><strong>File:</strong> <code>js/database.js</code></p>
+                    <p><strong>Function:</strong> <code>sanitiseInput()</code> ~line 40</p>
+                    <p>Escapes &lt; &gt; " ' / before any data touches the DOM or database.</p>
+                </div>
+                <div class="security-item">
+                    <h5>🔑 Session Tokens</h5>
+                    <p><strong>File:</strong> <code>js/database.js</code></p>
+                    <p><strong>Object:</strong> <code>SessionManager</code> ~line 90</p>
+                    <p>Cryptographically random 256-bit token. Stored in <em>sessionStorage</em> (cleared on tab close). Expires in 2 hours.</p>
+                </div>
+                <div class="security-item">
+                    <h5>🚫 Brute-Force Protection</h5>
+                    <p><strong>File:</strong> <code>js/database.js</code></p>
+                    <p><strong>Object:</strong> <code>LoginRateLimiter</code> ~line 62</p>
+                    <p>Locks login for 30 seconds after 5 failed attempts.</p>
+                </div>
+                <div class="security-item">
+                    <h5>🛡 Content Security Policy</h5>
+                    <p><strong>File:</strong> <code>index.html</code> &lt;head&gt;</p>
+                    <p><strong>Tag:</strong> <code>meta http-equiv CSP</code></p>
+                    <p>Restricts scripts, styles, fonts to trusted origins. Prevents unauthorised resource loading.</p>
+                </div>
+                <div class="security-item">
+                    <h5>🔒 Auth Guard</h5>
+                    <p><strong>File:</strong> <code>js/app.js</code></p>
+                    <p><strong>Function:</strong> <code>requireAuth()</code> ~line 60</p>
+                    <p>Every protected action calls this before executing. Redirects to login if session invalid.</p>
+                </div>
+                <div class="security-item">
+                    <h5>✅ DB Constraints</h5>
+                    <p><strong>File:</strong> <code>js/database.js</code></p>
+                    <p><strong>Location:</strong> <code>initDatabase()</code> SQL schema</p>
+                    <p>CHECK constraints, ENUM-like TEXT checks, and FOREIGN KEYS enforce data integrity at the DB layer.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- SQL Schema display -->
+        <h3 style="color:var(--purple-300);margin-bottom:14px"><i class="fas fa-table"></i> Live SQL Tables</h3>
+
+        <div class="schema-section">
+            <h4><i class="fas fa-users"></i> patients</h4>
+            <pre class="sql-block">CREATE TABLE patients (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    name             TEXT    NOT NULL,
+    email            TEXT    UNIQUE NOT NULL,
+    password_hash    TEXT    NOT NULL,          -- SHA-256 hashed, never plain text
+    age              INTEGER NOT NULL CHECK(age &gt; 0 AND age &lt; 130),
+    height_cm        REAL    NOT NULL,
+    weight_kg        REAL    NOT NULL,
+    phone            TEXT    NOT NULL,
+    emergency_phone  TEXT    NOT NULL,
+    insurance_cat    TEXT    DEFAULT 'none',
+    insurance_status TEXT    DEFAULT 'Inactive'
+                     CHECK(insurance_status IN ('Active','Inactive','Pending')),
+    created_at       TEXT    DEFAULT (datetime('now'))
+);</pre>
+        </div>
+
+        <div class="schema-section">
+            <h4><i class="fas fa-heartbeat"></i> health_metrics</h4>
+            <pre class="sql-block">CREATE TABLE health_metrics (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id     INTEGER NOT NULL,
+    heart_rate     INTEGER CHECK(heart_rate BETWEEN 20 AND 300),
+    blood_pressure TEXT,
+    blood_sugar    INTEGER CHECK(blood_sugar BETWEEN 20 AND 800),
+    recorded_at    TEXT    DEFAULT (datetime('now')),
+    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
+);</pre>
+        </div>
+
+        <div class="schema-section">
+            <h4><i class="fas fa-calendar-check"></i> appointments</h4>
+            <pre class="sql-block">CREATE TABLE appointments (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id   INTEGER NOT NULL,
+    doctor_name  TEXT    NOT NULL,
+    appt_date    TEXT    NOT NULL,
+    appt_time    TEXT    NOT NULL,
+    reason       TEXT,
+    status       TEXT    DEFAULT 'Scheduled'
+                 CHECK(status IN ('Scheduled','Completed','Cancelled')),
+    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
+);</pre>
+        </div>
+
+        <div class="schema-section">
+            <h4><i class="fas fa-flask"></i> test_results</h4>
+            <pre class="sql-block">CREATE TABLE test_results (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id    INTEGER NOT NULL,
+    test_name     TEXT    NOT NULL,
+    test_date     TEXT    NOT NULL,
+    result_value  TEXT,
+    result_status TEXT    DEFAULT 'Normal'
+                  CHECK(result_status IN ('Normal','Abnormal','Critical')),
+    notes         TEXT,
+    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
+);</pre>
+        </div>
+
+        <div class="schema-section">
+            <h4><i class="fas fa-x-ray"></i> imaging_appointments</h4>
+            <pre class="sql-block">CREATE TABLE imaging_appointments (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id     INTEGER NOT NULL,
+    test_type      TEXT    NOT NULL,               -- MRI, CT Scan, X-Ray, ECG, EMG…
+    body_area      TEXT,
+    priority       TEXT    DEFAULT 'Routine'
+                   CHECK(priority IN ('Routine','Urgent','Emergency')),
+    appt_date      TEXT    NOT NULL,
+    appt_time      TEXT    NOT NULL,
+    notes          TEXT,
+    status         TEXT    DEFAULT 'Scheduled'
+                   CHECK(status IN ('Scheduled','Completed','Cancelled')),
+    results_ready  INTEGER DEFAULT 0,
+    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
+);</pre>
+        </div>
+
+        <div style="margin-top:24px;padding:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md)">
+            <p style="font-size:0.85rem;color:var(--text-3)">
+                <i class="fas fa-info-circle" style="color:var(--purple-400)"></i>
+                This application uses <strong style="color:var(--purple-300)">sql.js</strong> — a port of SQLite to WebAssembly — running entirely in the browser.
+                In a production deployment, replace with a server-side database (MySQL / PostgreSQL) and move all DB logic to a secure backend API.
+            </p>
+        </div>
+    </div>
+
+    <footer>
+        <p>ZR Health Care &copy; 2025 &nbsp;|&nbsp; <i class="fas fa-shield-halved"></i> SHA-256 Hashing &nbsp;|&nbsp; <i class="fas fa-lock"></i> SQL Parameterised Queries &nbsp;|&nbsp; <i class="fas fa-eye-slash"></i> XSS Protected</p>
+        <p style="margin-top:8px">This is a demonstration system. For production use, deploy with a server-side backend.</p>
+    </footer>
+</div>
+
+<!-- sql.js WASM (SQLite in browser) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"></script>
+
+<!-- Our scripts (order matters) -->
+<script src="js/database.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
